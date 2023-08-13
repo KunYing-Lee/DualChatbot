@@ -1,0 +1,5 @@
+gTTS==2.3.2
+langchain==0.0.263
+openai==0.27.8
+streamlit==1.25.0
+streamlit_chat==0.1.1
