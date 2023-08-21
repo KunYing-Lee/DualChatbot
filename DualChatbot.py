@@ -17,8 +17,10 @@ from langchain.chains import ConversationChain
 from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 
+
 # Add a sidebar input for API keys
 api_key = st.sidebar.text_input("Enter your OpenAI API key")
+
 
 class Chatbot:
     
@@ -71,8 +73,8 @@ class Chatbot:
         
         # Determine the number of exchanges between two bots
         exchange_counts_dict = {
-            'Short': {'Conversation': 8, 'Debate': 4},
-            'Long': {'Conversation': 16, 'Debate': 8}
+            'Short': {'Conversation': 8, 'Debate': 4, 'Paper Digest': 4},
+            'Long': {'Conversation': 16, 'Debate': 8, 'Paper Digest': 8}
         }
         exchange_counts = exchange_counts_dict[self.session_length][self.learning_mode]
         
@@ -129,18 +131,65 @@ class Chatbot:
             {exchange_counts} times. 
             Everytime you speak, you can only speak no more than 
             {argument_num_dict[self.proficiency_level]} sentences."""
+
+        elif self.learning_mode == 'Paper Digest':
+            prompt = f"""You are simulating a journalist-author interaction about the paper titled "{paper_title}". 
+            You are taking on the role of a {self.role['name']}.
+            Your goal is to ask relevant questions about the paper, and the author will provide answers.
+            The conversation should be conducted in {self.language}.
+            Assume the learners' proficiency level in {self.language} is {self.proficiency_level}.
+            You should {lang_requirement}.
+            You should exchange questions and answers about the paper a total of {exchange_counts} times.
+            Make the interaction informative and engaging."""
         
         else:
-            raise KeyError('Currently unsupported learning mode!')
+            raise KeyError('Currently unsupported mode!')
         
         # Give bot instructions
         if self.starter:
             # In case the current bot is the first one to speak
-            prompt += f"You are leading the {self.learning_mode}. \n"
+            if self.learning_mode == 'Paper Digest':
+                prompt += f"""You are a technical journalist. 
+                Your task is to distill a recently published scientific paper through
+                an interview with the author, which is played by another chatbot.
+                Your objective is to ask comprehensive and technical questions 
+                so that anyone who reads the interview can understand the paper's main ideas and contributions, 
+                even without reading the paper itself. 
+                You're provided with the paper's summary to guide your initial questions.
+                You must keep the following guidelines in mind:
+                - Focus exclusive on the technical content of the paper.
+                - Avoid general questions, focusing instead on specifics related to the paper.
+                - Only ask one question at a time.
+                - Feel free to ask about the study's purpose, methods, results, and significance, 
+                and clarify any technical terms or complex concepts. 
+                - Your goal is to lead the conversation towards a clear and engaging summary.
+                - Do not include any prefixed labels like "Interviewer:" or "Question:" in your question.
+            
+                """
+            else:
+                prompt += f"You are leading the {self.learning_mode}. \n"
         
         else:
             # In case the current bot is the second one to speak
-            prompt += f"Wait for the {self.oppo_role['name']}'s statement."
+            if self.learning_mode == 'Paper Digest':
+                prompt += f"""You are the author of a recently published scientific paper.
+                You are being interviewed by a technical journalist who is played by another chatbot and
+                looking to write an article to summarize your paper.
+                Your task is to provide comprehensive, clear, and accurate answers to the journalist's questions.
+                Please keep the following guidelines in mind:
+                - Try to explain complex concepts and technical terms in an understandable way, without sacrificing accuracy.
+                - Your responses should primarily come from the relevant content of this paper, 
+                which will be provided to you in the following, but you can also use your broad knowledge to 
+                provide context or clarify complex topics. 
+                - Remember to differentiate when you are providing information directly from the paper versus 
+                when you're giving additional context or interpretation. Use phrases like 'According to the paper...' for direct information, 
+                and 'Based on general knowledge in the field...' when you're providing additional context.
+                - Only answer one question at a time. Ensure that each answer is complete before moving on to the next question.
+                - Do not include any prefixed labels like "Author:", "Interviewee:", Respond:", or "Answer:" in your answer.
+                Also, wait for the journalist's statement.
+                """
+            else:
+                prompt += f"Wait for the {self.oppo_role['name']}'s statement."
         
         return prompt
     
@@ -262,19 +311,46 @@ class DualChatbot:
         
 
         # Specify instruction
-        instruction = """The following text is a simulated conversation in 
-        {src_lang}. The goal of this text is to aid {src_lang} learners to learn
-        real-life usage of {src_lang}. Therefore, your task is to summarize the key 
-        learning points based on the given text. Specifically, you should summarize 
-        the key vocabulary, grammar points, and function phrases that could be important 
-        for students learning {src_lang}. Your summary should be conducted in English, but
-        use examples from the text in the original language where appropriate.
-        Remember your target students have a proficiency level of 
-        {proficiency} in {src_lang}. You summarization must match with their 
-        proficiency level. 
+        if learning_mode == 'Paper Digest':
+            instruction = """The following text is a simulated conversation in 
+            {src_lang}. The goal of this text is to aid {src_lang} users better understand the paper.
+            Therefore, your task is to summarize the key points based on the conversation between the
+            journalist bot and the author bot. Your summary should be conducted in English, but
+            use examples from the text in the original language where appropriate.
+            You summarization must match with their proficiency level.
+            Remember your target users have a proficiency level of 
+            {proficiency}.
+            The conversation is: \n
+            {script}.
+            """
+        elif learning_mode == 'Debate':
+            instruction = """The following text is a simulated conversation in 
+            {src_lang}. The goal of this text is to aid {src_lang} users better understand the pros and
+            cons concerning the debate topic.
+            Therefore, your task is to summarize the key points based on the debate.Specifically, you should
+            summarize the pros and cons of the debate topic.
+            Your summary should be conducted in English, but
+            use examples from the text in the original language where appropriate.
+            You summarization must match with their proficiency level.
+            Remember your target users have a proficiency level of 
+            {proficiency}.
+            The conversation is: \n
+            {script}.
+            """
+        else:
+            instruction == """The following text is a simulated conversation in 
+            {src_lang}. The goal of this text is to aid {src_lang} learners to learn
+            real-life usage of {src_lang}. Therefore, your task is to summarize the key 
+            learning points based on the given text. Specifically, you should summarize 
+            the key vocabulary, grammar points, and function phrases that could be important 
+            for students learning {src_lang}. Your summary should be conducted in English, but
+            use examples from the text in the original language where appropriate.
+            Remember your target students have a proficiency level of 
+            {proficiency} in {src_lang}. You summarization must match with their 
+            proficiency level. 
 
-        The conversation is: \n
-        {script}."""
+            The conversation is: \n
+            {script}."""
 
         prompt = PromptTemplate(
             input_variables=["src_lang", "proficiency", "script"],
@@ -301,13 +377,13 @@ class DualChatbot:
         self.input1 = "Start the conversation."
         self.input2 = "" 
 
-# Define the language learning settings
+# Define the settings
 LANGUAGES = ['English', 'German', 'Spanish', 'French', 'Chinese']
 SESSION_LENGTHS = ['Short', 'Long']
 PROFICIENCY_LEVELS = ['Beginner', 'Intermediate', 'Advanced']
 MAX_EXCHANGE_COUNTS = {
-    'Short': {'Conversation': 8, 'Debate': 4},
-    'Long': {'Conversation': 16, 'Debate': 8}
+    'Short': {'Conversation': 8, 'Debate': 4, 'Paper Digest': 4},
+    'Long': {'Conversation': 16, 'Debate': 8, 'Paper Digest': 8}
 }
 AUDIO_SPEECH = {
     'English': 'en',
@@ -322,17 +398,17 @@ AVATAR_SEED = [123, 42]
 engine = 'OpenAI'
 
 # Set the title of the app
-st.title('Dual Chatbot Language Learning')
+st.title('Dual Chatbot')
 
 # Set the description of the app
 st.markdown("""
-This app generates conversation or debate scripts to aid in language learning 🎯 
+This app uses a dual chatbot system to generate conversations, debates or paper summary. 🎯 
 
 Choose your desired settings and press 'Generate' to start 🚀
 """)
 
 # Add a selectbox for learning mode
-learning_mode = st.sidebar.selectbox('Learning Mode 📖', ('Conversation', 'Debate'))
+learning_mode = st.sidebar.selectbox('Mode 📖', ('Conversation', 'Debate', 'Paper Digest'))
 
 if learning_mode == 'Conversation':
     role1 = st.sidebar.text_input('Role 1 🎭')
@@ -348,7 +424,7 @@ if learning_mode == 'Conversation':
         'role2': {'name': role2, 'action': action2}
     }
 
-else:
+elif learning_mode == 'Debate':
     scenario = st.sidebar.text_input('Debate Topic 💬')
 
     # Configure role dictionary
@@ -357,6 +433,20 @@ else:
         'role2': {'name': 'Opponent'}
     }
     time_delay = 5
+elif learning_mode == 'Paper Digest':
+    paper_title = st.sidebar.text_input('Paper Title 📄')
+    uploaded_paper = st.sidebar.file_uploader("Upload a PDF paper", type=["pdf"])
+    role_dict = {
+        'role1': {'name': 'Journalist'},
+        'role2': {'name': 'Author'}
+    }
+    scenario = "Default Paper Digest Scenario"
+    time_delay = 2
+
+    if uploaded_paper is not None:
+        pdf_text = uploaded_paper.read().decode('latin-1')
+    else:
+        pdf_text = ""
 
 language = st.sidebar.selectbox('Target Language 🔤', LANGUAGES)
 session_length = st.sidebar.selectbox('Session Length ⏰', SESSION_LENGTHS)
@@ -434,8 +524,11 @@ if 'dual_chatbots' not in st.session_state:
                 st.write(f"""#### The following conversation happens between 
                                 {role1} and {role2} {scenario} 🎭""")
 
-            else:
+            elif learning_mode == 'Debate':
                 st.write(f"""#### Debate 💬: {scenario}""")
+
+            else:
+                st.write(f"""#### The following conversation happens between a journalist and the author""")
 
             # Instantiate dual-chatbot system
             dual_chatbots = DualChatbot(engine, role_dict, language, scenario,
@@ -460,8 +553,6 @@ if 'dual_chatbots' not in st.session_state:
                 # Update session state
                 st.session_state.bot1_mesg.append(mesg_1)
                 st.session_state.bot2_mesg.append(mesg_2)
-                
-
 
 if 'dual_chatbots' in st.session_state:  
 
@@ -510,7 +601,7 @@ if 'dual_chatbots' in st.session_state:
     
 
     # Create summary for key learning points
-    summary_expander = st.expander('Key Learning Points')
+    summary_expander = st.expander('Key Points')
     scripts = []
     for mesg_1, mesg_2 in zip(mesg1_list, mesg2_list):
         for i, mesg in enumerate([mesg_1, mesg_2]):
